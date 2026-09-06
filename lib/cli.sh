@@ -13,7 +13,7 @@ ${c_bold}$APP${c_reset} $VERSION — watch a folder and auto-compress videos wit
 
 ${c_bold}usage:${c_reset} $APP <command>
 
-  ${c_bold}status${c_reset}              show settings and whether it's watching
+  ${c_bold}status${c_reset}              show active status and configuration
   ${c_bold}start${c_reset}               start watching (sets everything up on first run)
   ${c_bold}stop${c_reset}                stop watching
   ${c_bold}config set${c_reset} K V      change a setting

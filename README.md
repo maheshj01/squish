@@ -30,17 +30,35 @@ agent is silently denied there. The run log lives at `~/Library/Logs/squish.log`
 
 ## Install
 
+**Homebrew** (recommended once the tap is published):
+
 ```bash
-./squish start
+brew install maheshj01/tap/squish   # or: brew install --HEAD ...
+squish start
 ```
 
-`start` does everything the first time: copies the code to `~/.local/share/squish`,
-symlinks `~/bin/squish` onto your `PATH`, installs tab-completion, creates the
-folders, and begins watching. It's idempotent — run it again any time to pick up
-changes. Then just drop a video into `~/Movies/squish/clips`; the compressed copy
-appears under `~/Movies/squish/compressed/<name>/` with a notification.
+**Manual / from a clone:**
 
-Two one-time shell tweaks `start` will prompt for if needed — add to `~/.zshrc`:
+```bash
+./install.sh      # copies to ~/.local/share/squish, links ~/bin/squish,
+                  # installs zsh completion, then runs `squish start`
+```
+
+**Dev (run straight from the repo):**
+
+```bash
+./squish start    # uses the repo code in place; no copying
+```
+
+`squish start` **creates the default folders if they don't exist**
+(`~/Movies/squish/clips` and `~/Movies/squish/compressed`) and loads the launchd
+agent. Then drop a video into `clips/`; the compressed copy appears under
+`compressed/<name>/` with a notification. File placement (the CLI on `PATH`,
+`lib/`, the completion) is done by the installer — Homebrew or `install.sh` —
+not by `start`.
+
+For a manual install, add these to `~/.zshrc` once (the installer prints them if
+needed); Homebrew wires both up for you:
 
 ```bash
 export PATH="$HOME/bin:$PATH"                                   # so `squish` is found
@@ -82,30 +100,38 @@ Tab-completion (zsh) completes commands, keys, presets, and folders.
 
 ## Where things live
 
+Runtime files (created/managed by `squish`, same for every install method):
+
 | Thing         | Path                                                       |
 | ------------- | ---------------------------------------------------------- |
-| CLI (symlink) | `~/bin/squish` → `~/.local/share/squish/squish`            |
-| Installed code| `~/.local/share/squish/` (entry point + `lib/`)            |
 | Watch folder  | `~/Movies/squish/clips` (change with `config set WATCH_DIR`)|
 | Output folder | `~/Movies/squish/compressed/` (one subfolder per video)    |
 | Config        | `~/.config/squish/config`                                  |
-| Completion    | `~/.zsh/completions/_squish`                               |
 | launchd agent | `~/Library/LaunchAgents/com.mahesh.squish.plist`           |
 | Run log       | `~/Library/Logs/squish.log`                                |
 | launchd log   | `~/Library/Logs/squish.launchd.log`                        |
+
+Program files (placed by the installer):
+
+| Install     | CLI on PATH             | code + completion                              |
+| ----------- | ----------------------- | ---------------------------------------------- |
+| Homebrew    | `$(brew --prefix)/bin/squish` | `…/libexec/` · `…/share/zsh/site-functions/_squish` |
+| `install.sh`| `~/bin/squish`          | `~/.local/share/squish/` · `~/.zsh/completions/_squish` |
 
 ## Project layout
 
 ```
 squish            thin entry point — resolves its path, sources lib/, dispatches
 lib/
-  common.sh       constants, paths, output helpers
+  common.sh       app identity, launchd + runtime paths, output helpers
   config.sh       load / validate / persist settings (the write side)
   agent.sh        launchd plist, start/stop, status (the read side)
   worker.sh       the run() compression pass
   cli.sh          help + command dispatch
 completions/
   _squish         zsh tab-completion
+install.sh        manual/dev installer (non-Homebrew)
+Formula/squish.rb Homebrew formula
 ```
 
 Adding a command: write its function in the right `lib/` module, then register a
@@ -124,6 +150,19 @@ copying. The `run` worker defends against that:
 
 > `Bootstrap failed: 5` when loading means the agent is **already loaded**, not
 > broken. Re-running `squish start` handles the unload/reload for you.
+
+## Publishing to Homebrew
+
+`Formula/squish.rb` is ready. To ship it via a tap:
+
+1. Tag a release: `git tag v0.3.0 && git push --tags` (keep the tag in sync with
+   `VERSION` in `lib/common.sh`).
+2. Get the tarball hash and put it in the formula's `sha256`:
+   `curl -sL https://github.com/maheshj01/squish/archive/refs/tags/v0.3.0.tar.gz | shasum -a 256`
+3. Create a tap repo named `homebrew-tap`, add `Formula/squish.rb` to it, push.
+4. Users then: `brew install maheshj01/tap/squish`.
+
+Before tagging, test the formula locally: `brew install --HEAD Formula/squish.rb`.
 
 ## Roadmap
 

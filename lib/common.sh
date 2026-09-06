@@ -8,10 +8,9 @@ APP="squish"
 VERSION="0.3.0"
 LABEL="com.mahesh.squish"
 
-# ---- install locations (stable; launchd points here) ----------------------
-INSTALL_DIR="$HOME/.local/share/$APP"          # where the code lives once installed
-BIN_LINK="$HOME/bin/$APP"                       # convenience symlink on PATH
-COMPLETION_DIR="$HOME/.zsh/completions"         # zsh tab-completion drop-in
+# ---- launchd paths --------------------------------------------------------
+# File placement (the CLI on PATH, lib/, completion) is the installer's job —
+# Homebrew or ./install.sh. The lib only needs the launchd + runtime paths.
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LAUNCHD_LOG="$HOME/Library/Logs/$APP.launchd.log"
 
