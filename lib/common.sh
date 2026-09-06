@@ -20,7 +20,10 @@ CONFIG_FILE="$CONFIG_DIR/config"
 LOCK="/tmp/$APP.lock"
 
 # ---- defaults: the single source of truth for `config reset` --------------
-DEFAULT_WATCH_DIR="$HOME/Desktop/recorder"
+# NOTE: keep the watch folder OUT of ~/Desktop, ~/Documents, ~/Downloads — those
+# are TCC-protected and a headless launchd agent is silently denied access there.
+# ~/Movies is not protected, so the agent can read/write without a prompt.
+DEFAULT_WATCH_DIR="$HOME/Movies/recorder"
 DEFAULT_CRF=23
 DEFAULT_PRESET=medium
 DEFAULT_AUDIO_BITRATE=128k
