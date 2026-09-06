@@ -7,10 +7,13 @@
 
 cmd_run() {
   load_config
-  local OUT_DIR="$WATCH_DIR/outputs"
+  # Outputs and logs live OUTSIDE the watch folder — writing inside it would
+  # re-fire WatchPaths and loop the agent. Outputs go to a sibling folder that
+  # auto-follows WATCH_DIR; the log lives under ~/Library/Logs.
+  local OUT_DIR="${WATCH_DIR%/}-compressed"
   local LOG_DIR="$OUT_DIR/logs"
-  local LOG="$WATCH_DIR/compress.log"
-  mkdir -p "$OUT_DIR" "$LOG_DIR"
+  local LOG="$RUN_LOG"
+  mkdir -p "$OUT_DIR" "$LOG_DIR" "$(dirname "$LOG")"
 
   log() { printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*" >> "$LOG"; }
   human() { awk -v b="$1" 'BEGIN{ if(b>=1048576) printf "%.1f MB",b/1048576; else printf "%.0f KB",b/1024 }'; }

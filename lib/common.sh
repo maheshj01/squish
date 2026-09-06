@@ -18,6 +18,9 @@ LAUNCHD_LOG="$HOME/Library/Logs/$APP.launchd.log"
 CONFIG_DIR="$HOME/.config/$APP"
 CONFIG_FILE="$CONFIG_DIR/config"
 LOCK="/tmp/$APP.lock"
+# The run log MUST live outside the watch folder: anything written inside the
+# watched path re-fires WatchPaths and the agent loops on itself.
+RUN_LOG="$HOME/Library/Logs/$APP.log"
 
 # ---- defaults: the single source of truth for `config reset` --------------
 # NOTE: keep the watch folder OUT of ~/Desktop, ~/Documents, ~/Downloads — those

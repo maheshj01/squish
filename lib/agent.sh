@@ -85,7 +85,9 @@ cmd_uninstall() {
 cmd_status() {
   load_config
   printf '%swatch folder%s   %s\n' "$c_bold" "$c_reset" "$WATCH_DIR"
+  printf '%soutput folder%s  %s\n' "$c_bold" "$c_reset" "${WATCH_DIR%/}-compressed"
   printf '%sconfig file%s    %s\n' "$c_bold" "$c_reset" "$([[ -f "$CONFIG_FILE" ]] && echo "$CONFIG_FILE" || echo "(defaults)")"
+  printf '%srun log%s        %s\n' "$c_bold" "$c_reset" "$RUN_LOG"
   printf '%sinstalled%s      %s\n' "$c_bold" "$c_reset" "$([[ -x "$INSTALL_DIR/$APP" ]] && echo "$INSTALL_DIR/$APP" || echo "no")"
   printf '%splist%s          %s\n' "$c_bold" "$c_reset" "$(is_installed && echo "$PLIST" || echo "not installed")"
   printf '%sagent loaded%s   %s\n' "$c_bold" "$c_reset" "$(is_loaded && echo yes || echo no)"
@@ -96,8 +98,6 @@ cmd_stop()    { agent_unload; ok "agent unloaded."; }
 cmd_restart() { is_installed || die "not installed — run: $APP install"; agent_unload; agent_load; ok "agent reloaded."; }
 
 cmd_logs() {
-  load_config
-  local log="$WATCH_DIR/compress.log"
-  [[ -f "$log" ]] || die "no log yet at $log"
-  if [[ "${1:-}" == "-f" ]]; then tail -f "$log"; else tail -n "${1:-40}" "$log"; fi
+  [[ -f "$RUN_LOG" ]] || die "no log yet at $RUN_LOG"
+  if [[ "${1:-}" == "-f" ]]; then tail -f "$RUN_LOG"; else tail -n "${1:-40}" "$RUN_LOG"; fi
 }
