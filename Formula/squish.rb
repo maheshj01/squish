@@ -1,9 +1,9 @@
 class Squish < Formula
   desc "Watch a folder and auto-compress videos with ffmpeg"
   homepage "https://github.com/maheshj01/squish"
-  # After tagging a release (e.g. v0.3.0), point url at its tarball and fill in
+  # After tagging a release (e.g. v0.1.0), point url at its tarball and fill in
   # the sha256:  curl -sL <url> | shasum -a 256
-  url "https://github.com/maheshj01/squish/archive/refs/tags/v0.3.0.tar.gz"
+  url "https://github.com/maheshj01/squish/archive/refs/tags/v0.1.0.tar.gz"
   sha256 "REPLACE_WITH_TARBALL_SHA256"
   license "MIT"
   head "https://github.com/maheshj01/squish.git", branch: "main"

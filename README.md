@@ -155,10 +155,10 @@ copying. The `run` worker defends against that:
 
 `Formula/squish.rb` is ready. To ship it via a tap:
 
-1. Tag a release: `git tag v0.3.0 && git push --tags` (keep the tag in sync with
+1. Tag a release: `git tag v0.1.0 && git push --tags` (keep the tag in sync with
    `VERSION` in `lib/common.sh`).
 2. Get the tarball hash and put it in the formula's `sha256`:
-   `curl -sL https://github.com/maheshj01/squish/archive/refs/tags/v0.3.0.tar.gz | shasum -a 256`
+   `curl -sL https://github.com/maheshj01/squish/archive/refs/tags/v0.1.0.tar.gz | shasum -a 256`
 3. Create a tap repo named `homebrew-tap`, add `Formula/squish.rb` to it, push.
 4. Users then: `brew install maheshj01/tap/squish`.
 
