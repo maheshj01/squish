@@ -1,0 +1,45 @@
+#!/bin/bash
+# common.sh — constants, paths, and output helpers shared by every module.
+#
+# Sourced by the `squish` entry point before any other lib. Everything here is
+# global on purpose; keep it dependency-free so other modules can rely on it.
+
+APP="squish"
+VERSION="0.2.0"
+LABEL="com.mahesh.squish"
+
+# ---- install locations (stable; launchd points here) ----------------------
+INSTALL_DIR="$HOME/.local/share/$APP"          # where the code lives once installed
+BIN_LINK="$HOME/bin/$APP"                       # convenience symlink on PATH
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+LAUNCHD_LOG="$HOME/Library/Logs/$APP.launchd.log"
+
+# ---- runtime paths --------------------------------------------------------
+CONFIG_DIR="$HOME/.config/$APP"
+CONFIG_FILE="$CONFIG_DIR/config"
+LOCK="/tmp/$APP.lock"
+
+# ---- defaults: the single source of truth for `config reset` --------------
+DEFAULT_WATCH_DIR="$HOME/Desktop/recorder"
+DEFAULT_CRF=23
+DEFAULT_PRESET=medium
+DEFAULT_AUDIO_BITRATE=128k
+DEFAULT_NOTIFY=1
+
+# recognised config keys, in display order
+KEYS=(WATCH_DIR CRF PRESET AUDIO_BITRATE NOTIFY)
+
+# ---- output helpers -------------------------------------------------------
+# Colours only when stderr is a TTY, so piped/logged output stays clean.
+if [[ -t 2 ]]; then
+  c_reset=$'\033[0m'; c_bold=$'\033[1m'; c_dim=$'\033[2m'
+  c_red=$'\033[31m'; c_grn=$'\033[32m'; c_yel=$'\033[33m'
+else
+  c_reset=""; c_bold=""; c_dim=""; c_red=""; c_grn=""; c_yel=""
+fi
+
+say()  { printf '%s\n' "$*"; }                                   # stdout: data
+info() { printf '%s\n' "$*" >&2; }                               # stderr: chatter
+ok()   { printf '%s%s%s\n' "$c_grn" "$*" "$c_reset" >&2; }
+warn() { printf '%s%s%s\n' "$c_yel" "$*" "$c_reset" >&2; }
+die()  { printf '%s%s%s\n' "$c_red" "$*" "$c_reset" >&2; exit 1; }
