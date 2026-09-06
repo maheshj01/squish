@@ -135,33 +135,41 @@ cmd_run() {
     log "    still growing after 5 minutes, giving up"; return 1
   }
 
+  # A file can be dropped WHILE we're mid-encode. We hold the lock the whole
+  # time, so after each full scan we rescan and repeat until a pass compresses
+  # nothing new — anything that arrived mid-run is caught in this same session.
   shopt -s nullglob nocaseglob
-  local candidates=0 processed=0 src name ext base clip_dir dst fflog before after pct
-  for src in "$WATCH_DIR"/*; do
-    [[ -f "$src" ]] || continue
-    name=$(basename "$src"); ext="${name##*.}"; base="${name%.*}"
-    case "$name" in .DS_Store|.*) continue ;; esac
-    _is_video "$ext" || { log "skip '$name': .$ext is not a video type"; continue; }
-    candidates=$(( candidates + 1 ))
-    # each video gets its own subfolder: compressed/<base>/{<base>.mp4,<base>.log}
-    clip_dir="$OUT_DIR/$base"; dst="$clip_dir/${base}.mp4"; fflog="$clip_dir/${base}.log"
-    [[ -e "$dst" ]] && { log "skip '$name': already compressed"; continue; }
+  local processed=0 pass=0 pass_n src name ext base clip_dir dst fflog before after pct
+  while :; do
+    pass=$(( pass + 1 )); pass_n=0
+    for src in "$WATCH_DIR"/*; do
+      [[ -f "$src" ]] || continue
+      name=$(basename "$src"); ext="${name##*.}"; base="${name%.*}"
+      case "$name" in .DS_Store|.*) continue ;; esac
+      _is_video "$ext" || { (( pass == 1 )) && log "skip '$name': .$ext is not a video type"; continue; }
+      # each video gets its own subfolder: compressed/<base>/{<base>.mp4,<base>.log}
+      clip_dir="$OUT_DIR/$base"; dst="$clip_dir/${base}.mp4"; fflog="$clip_dir/${base}.log"
+      [[ -e "$dst" ]] && { (( pass == 1 )) && log "skip '$name': already compressed"; continue; }
 
-    log "FOUND: $name"
-    wait_until_stable "$src" || { log "skip '$name': file never settled"; continue; }
+      log "FOUND: $name"
+      wait_until_stable "$src" || { log "skip '$name': file never settled"; continue; }
 
-    before=$(stat -f%z "$src")
-    log "encoding '$name' ($(_human "$before")) -> compressed/$base/$(basename "$dst")"
-    log "  ffmpeg output: $fflog"
-    if _encode "$src" "$dst" "$fflog" "$FFMPEG"; then
-      after=$(stat -f%z "$dst"); pct=$(( 100 - (after * 100 / before) ))
-      log "OK: $(basename "$dst") — $(_human "$after"), ${pct}% smaller"
-      notify "Compression done" "$base — ${pct}% smaller"; processed=$(( processed + 1 ))
-    else
-      log "FAILED: '$name' — ffmpeg error. Last lines:"
-      tail -5 "$fflog" 2>/dev/null | sed 's/^/    /' >> "$LOG"
-      notify "Compression failed" "$base"
-    fi
+      before=$(stat -f%z "$src")
+      log "encoding '$name' ($(_human "$before")) -> compressed/$base/$(basename "$dst")"
+      log "  ffmpeg output: $fflog"
+      if _encode "$src" "$dst" "$fflog" "$FFMPEG"; then
+        after=$(stat -f%z "$dst"); pct=$(( 100 - (after * 100 / before) ))
+        log "OK: $(basename "$dst") — $(_human "$after"), ${pct}% smaller"
+        notify "Compression done" "$base — ${pct}% smaller"
+        processed=$(( processed + 1 )); pass_n=$(( pass_n + 1 ))
+      else
+        log "FAILED: '$name' — ffmpeg error. Last lines:"
+        tail -5 "$fflog" 2>/dev/null | sed 's/^/    /' >> "$LOG"
+        notify "Compression failed" "$base"
+      fi
+    done
+    (( pass_n > 0 )) || break   # a full pass added nothing new — done
+    log "rescan: $pass_n compressed in pass $pass — checking for files dropped meanwhile…"
   done
-  log "run finished: $candidates video file(s) seen, $processed compressed"
+  log "run finished: $processed compressed in $pass pass(es)"
 }

@@ -171,6 +171,8 @@ copying. The `run` worker defends against that:
 - **Lock directory** — one run at a time; extra triggers exit immediately.
 - **Size-stability poll** — waits until the file stops growing before encoding.
 - **Already-processed skip** — never re-compresses a clip that already has output.
+- **Mid-run rescan** — a run holds the lock, then rescans and repeats until a pass
+  compresses nothing new, so a video dropped while encoding is caught in the same run.
 - **Absolute ffmpeg path** — launchd gives the script almost no `PATH`.
 - **Outputs outside the watch folder** — so writing results never re-fires the watcher.
 
