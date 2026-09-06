@@ -131,8 +131,10 @@ lib/
 completions/
   _squish         zsh tab-completion
 install.sh        manual/dev installer (non-Homebrew)
-Formula/squish.rb Homebrew formula
 ```
+
+The Homebrew formula lives in the separate tap repo
+[`maheshj01/homebrew-tap`](https://github.com/maheshj01/homebrew-tap), not here.
 
 Adding a command: write its function in the right `lib/` module, then register a
 line in `cli_main()` and `cmd_help()` in `lib/cli.sh` and one in `completions/_squish`.
@@ -153,16 +155,26 @@ copying. The `run` worker defends against that:
 
 ## Publishing to Homebrew
 
-`Formula/squish.rb` is ready. To ship it via a tap:
+Standard two-repo tap layout — this repo is the **source**; the formula lives in
+the separate [`maheshj01/homebrew-tap`](https://github.com/maheshj01/homebrew-tap)
+repo, which scales to future tools:
 
-1. Tag a release: `git tag v0.1.0 && git push --tags` (keep the tag in sync with
+```
+maheshj01/squish          this repo — the source
+maheshj01/homebrew-tap    the tap  — Formula/squish.rb, later Formula/<next>.rb
+```
+
+Cut a release:
+
+1. Tag the source: `git tag v0.1.0 && git push --tags` (keep the tag in sync with
    `VERSION` in `lib/common.sh`).
-2. Get the tarball hash and put it in the formula's `sha256`:
+2. Hash the tarball and put it in the formula's `sha256` (in the tap repo):
    `curl -sL https://github.com/maheshj01/squish/archive/refs/tags/v0.1.0.tar.gz | shasum -a 256`
-3. Create a tap repo named `homebrew-tap`, add `Formula/squish.rb` to it, push.
+3. Commit + push the tap.
 4. Users then: `brew install maheshj01/tap/squish`.
 
-Before tagging, test the formula locally: `brew install --HEAD Formula/squish.rb`.
+Test from `main` before tagging (run from the tap repo):
+`brew install --HEAD maheshj01/tap/squish`.
 
 ## Roadmap
 
