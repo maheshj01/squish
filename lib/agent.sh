@@ -85,7 +85,7 @@ cmd_uninstall() {
 cmd_status() {
   load_config
   printf '%swatch folder%s   %s\n' "$c_bold" "$c_reset" "$WATCH_DIR"
-  printf '%soutput folder%s  %s\n' "$c_bold" "$c_reset" "${WATCH_DIR%/}-compressed"
+  printf '%soutput folder%s  %s\n' "$c_bold" "$c_reset" "$COMPRESSED_DIR"
   printf '%sconfig file%s    %s\n' "$c_bold" "$c_reset" "$([[ -f "$CONFIG_FILE" ]] && echo "$CONFIG_FILE" || echo "(defaults)")"
   printf '%srun log%s        %s\n' "$c_bold" "$c_reset" "$RUN_LOG"
   printf '%sinstalled%s      %s\n' "$c_bold" "$c_reset" "$([[ -x "$INSTALL_DIR/$APP" ]] && echo "$INSTALL_DIR/$APP" || echo "no")"

@@ -7,6 +7,7 @@
 # Populate WATCH_DIR/CRF/... from defaults, then overlay the config file.
 load_config() {
   WATCH_DIR="$DEFAULT_WATCH_DIR"
+  COMPRESSED_DIR="$DEFAULT_COMPRESSED_DIR"
   CRF="$DEFAULT_CRF"
   PRESET="$DEFAULT_PRESET"
   AUDIO_BITRATE="$DEFAULT_AUDIO_BITRATE"
@@ -20,7 +21,7 @@ load_config() {
     key="${line%%=*}"; val="${line#*=}"
     key="${key//[[:space:]]/}"
     case "$key" in
-      WATCH_DIR|CRF|PRESET|AUDIO_BITRATE|NOTIFY) printf -v "$key" '%s' "$val" ;;
+      WATCH_DIR|COMPRESSED_DIR|CRF|PRESET|AUDIO_BITRATE|NOTIFY) printf -v "$key" '%s' "$val" ;;
     esac
   done < "$CONFIG_FILE"
 }
@@ -30,7 +31,8 @@ save_config() {
   mkdir -p "$CONFIG_DIR"
   {
     printf '# %s config — edit with `%s config set KEY VALUE`\n' "$APP" "$APP"
-    printf 'WATCH_DIR=%s\n'     "$WATCH_DIR"
+    printf 'WATCH_DIR=%s\n'      "$WATCH_DIR"
+    printf 'COMPRESSED_DIR=%s\n' "$COMPRESSED_DIR"
     printf 'CRF=%s\n'           "$CRF"
     printf 'PRESET=%s\n'        "$PRESET"
     printf 'AUDIO_BITRATE=%s\n' "$AUDIO_BITRATE"
@@ -44,8 +46,8 @@ save_config() {
 validate() {
   local key="$1" val="$2"
   case "$key" in
-    WATCH_DIR)
-      [[ -n "$val" ]] || die "WATCH_DIR cannot be empty"
+    WATCH_DIR|COMPRESSED_DIR)
+      [[ -n "$val" ]] || die "$key cannot be empty"
       case "$val" in "~"/*) val="$HOME/${val#\~/}" ;; "~") val="$HOME" ;; esac
       printf '%s' "$val" ;;
     CRF)
@@ -96,13 +98,16 @@ cmd_config() {
       printf -v "$k" '%s' "$norm"
       save_config
       ok "set $k=$norm"
-      if [[ "$k" == WATCH_DIR ]]; then
-        mkdir -p "$WATCH_DIR"
-        reload_if_installed "watch folder changed"
-      fi
+      case "$k" in
+        WATCH_DIR)                      # baked into the plist -> reload the agent
+          mkdir -p "$WATCH_DIR"
+          reload_if_installed "watch folder changed" ;;
+        COMPRESSED_DIR) mkdir -p "$COMPRESSED_DIR" ;;   # not in the plist, no reload
+      esac
       ;;
     reset)
-      WATCH_DIR="$DEFAULT_WATCH_DIR"; CRF="$DEFAULT_CRF"; PRESET="$DEFAULT_PRESET"
+      WATCH_DIR="$DEFAULT_WATCH_DIR"; COMPRESSED_DIR="$DEFAULT_COMPRESSED_DIR"
+      CRF="$DEFAULT_CRF"; PRESET="$DEFAULT_PRESET"
       AUDIO_BITRATE="$DEFAULT_AUDIO_BITRATE"; NOTIFY="$DEFAULT_NOTIFY"
       save_config
       ok "config reset to defaults"

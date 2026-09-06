@@ -23,17 +23,23 @@ LOCK="/tmp/$APP.lock"
 RUN_LOG="$HOME/Library/Logs/$APP.log"
 
 # ---- defaults: the single source of truth for `config reset` --------------
-# NOTE: keep the watch folder OUT of ~/Desktop, ~/Documents, ~/Downloads — those
-# are TCC-protected and a headless launchd agent is silently denied access there.
+# Everything lives under one media home: ~/Movies/squish/{clips,compressed}.
+#   clips/       — the watch folder (videos are dropped here)
+#   compressed/  — one subfolder per video, holding the result + its log
+# NOTE: keep these OUT of ~/Desktop, ~/Documents, ~/Downloads — those are
+# TCC-protected and a headless launchd agent is silently denied access there.
 # ~/Movies is not protected, so the agent can read/write without a prompt.
-DEFAULT_WATCH_DIR="$HOME/Movies/recorder"
+# COMPRESSED_DIR must stay OUTSIDE the watch folder, or writing results would
+# re-fire WatchPaths and loop the agent (that's why it's a sibling of clips/).
+DEFAULT_WATCH_DIR="$HOME/Movies/squish/clips"
+DEFAULT_COMPRESSED_DIR="$HOME/Movies/squish/compressed"
 DEFAULT_CRF=23
 DEFAULT_PRESET=medium
 DEFAULT_AUDIO_BITRATE=128k
 DEFAULT_NOTIFY=1
 
 # recognised config keys, in display order
-KEYS=(WATCH_DIR CRF PRESET AUDIO_BITRATE NOTIFY)
+KEYS=(WATCH_DIR COMPRESSED_DIR CRF PRESET AUDIO_BITRATE NOTIFY)
 
 # ---- output helpers -------------------------------------------------------
 # Colours only when stderr is a TTY, so piped/logged output stays clean.

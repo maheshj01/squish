@@ -8,18 +8,20 @@ it with `ffmpeg`. A `launchd` agent does the watching; `squish` manages everythi
 Typical result: a screen recording drops ~90% in size in a few seconds.
 
 ```
-~/Movies/recorder/               drop videos here (inputs only, untouched)
-└── my-clip.mov
-
-~/Movies/recorder-compressed/    results — a SIBLING of the watch folder
-├── my-clip_output.mp4
-└── logs/my-clip.ffmpeg.log
+~/Movies/squish/
+├── clips/                     drop videos here (the watch folder; untouched)
+│   └── my-clip.mov
+└── compressed/                one subfolder per video
+    └── my-clip/
+        ├── my-clip.mp4        compressed result
+        └── my-clip.log        its ffmpeg log
 ```
 
-The output folder and the run log live **outside** the watched folder on purpose:
-anything written inside it would re-fire `launchd`'s `WatchPaths` and loop the
-agent. For the same reason the watch folder must not be a TCC-protected location
-(`~/Desktop`, `~/Documents`, `~/Downloads`) — a headless agent is denied there.
+`compressed/` is a sibling of `clips/`, i.e. **outside** the watched folder, on
+purpose: anything written inside the watch folder would re-fire `launchd`'s
+`WatchPaths` and loop the agent. For the same reason the watch folder must not be
+a TCC-protected location (`~/Desktop`, `~/Documents`, `~/Downloads`) — a headless
+agent is silently denied there. The run log lives at `~/Library/Logs/squish.log`.
 
 ## Requirements
 
@@ -65,16 +67,18 @@ squish config reset           # restore all defaults
 squish config path            # where the config file lives
 ```
 
-| Key             | Default            | Meaning                                   |
-| --------------- | ------------------ | ----------------------------------------- |
-| `WATCH_DIR`     | `~/Movies/recorder`  | Folder to watch (use `folder` to change) |
-| `CRF`           | `23`               | Quality 0–51, lower = better/bigger       |
-| `PRESET`        | `medium`           | ffmpeg speed/size tradeoff                |
-| `AUDIO_BITRATE` | `128k`             | Audio bitrate                             |
-| `NOTIFY`        | `1`                | `0` to silence macOS notifications        |
+| Key              | Default                     | Meaning                                    |
+| ---------------- | --------------------------- | ------------------------------------------ |
+| `WATCH_DIR`      | `~/Movies/squish/clips`     | Folder to watch (use `folder` to change)   |
+| `COMPRESSED_DIR` | `~/Movies/squish/compressed`| Where results go (must be outside the watch folder) |
+| `CRF`            | `23`                        | Quality 0–51, lower = better/bigger        |
+| `PRESET`         | `medium`                    | ffmpeg speed/size tradeoff                 |
+| `AUDIO_BITRATE`  | `128k`                      | Audio bitrate                              |
+| `NOTIFY`         | `1`                         | `0` to silence macOS notifications         |
 
 Settings are validated on write (a bad value is rejected, not saved) and read
-fresh on every run — no reload needed except for `WATCH_DIR`.
+fresh on every run — no reload needed except for `WATCH_DIR` (which is baked into
+the launchd plist, so changing it regenerates and reloads the agent).
 
 ### Agent control
 ```bash
@@ -96,8 +100,8 @@ squish run                    # the worker launchd calls; safe to run yourself
 | ------------- | ---------------------------------------------------------- |
 | CLI (symlink) | `~/bin/squish` → `~/.local/share/squish/squish`            |
 | Installed code| `~/.local/share/squish/` (entry point + `lib/`)            |
-| Watch folder  | `~/Movies/recorder` (default; change with `squish folder`) |
-| Output folder | `<watch folder>-compressed/`                               |
+| Watch folder  | `~/Movies/squish/clips` (default; change with `squish folder`) |
+| Output folder | `~/Movies/squish/compressed/` (one subfolder per video)    |
 | Config        | `~/.config/squish/config`                                  |
 | launchd agent | `~/Library/LaunchAgents/com.mahesh.squish.plist`           |
 | Run log       | `~/Library/Logs/squish.log`                                |
