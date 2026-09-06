@@ -31,68 +31,54 @@ agent is silently denied there. The run log lives at `~/Library/Logs/squish.log`
 ## Install
 
 ```bash
-./squish install
+./squish start
 ```
 
-This copies the code to `~/.local/share/squish`, symlinks `~/bin/squish` onto
-your `PATH`, generates the launchd agent, creates the watch folder, and starts
-watching. Make sure `~/bin` is on your `PATH` (add `export PATH="$HOME/bin:$PATH"`
-to `~/.zshrc` if needed — `install` warns you if it isn't).
+`start` does everything the first time: copies the code to `~/.local/share/squish`,
+symlinks `~/bin/squish` onto your `PATH`, installs tab-completion, creates the
+folders, and begins watching. It's idempotent — run it again any time to pick up
+changes. Then just drop a video into `~/Movies/squish/clips`; the compressed copy
+appears under `~/Movies/squish/compressed/<name>/` with a notification.
 
-Then just drop a video into the watch folder — a compressed copy appears in
-`outputs/` and you get a macOS notification when it's done.
+Two one-time shell tweaks `start` will prompt for if needed — add to `~/.zshrc`:
 
-## Usage
-
-```
-squish <command> [args]
-```
-
-### Target folder
 ```bash
-squish folder                 # print the current watch folder
-squish folder ~/Movies/caps   # set it (recreates + reloads the agent)
+export PATH="$HOME/bin:$PATH"                                   # so `squish` is found
+fpath=(~/.zsh/completions $fpath); autoload -Uz compinit; compinit   # tab-completion
 ```
-Changing the folder also updates the launchd `WatchPaths` and reloads the agent,
-because that path is baked into the plist — `squish` handles that for you.
 
-### Compression config
+## Commands
+
+The surface is deliberately small: **read state with `status`, change it with
+`config`.**
+
 ```bash
-squish config show            # effective settings + where they come from
-squish config get CRF
-squish config set CRF 20      # better quality, bigger file
-squish config set PRESET slow
-squish config set NOTIFY 0    # silence notifications
-squish config reset           # restore all defaults
-squish config path            # where the config file lives
+squish status              # settings + whether it's watching (the read view)
+squish start              # start watching (sets everything up on first run)
+squish stop               # stop watching
+squish config set CRF 20  # change a setting
+squish config reset       # restore defaults
+squish logs               # last 40 log lines   (squish logs -f to follow)
+squish help
+squish version
 ```
+
+### Settings (`config set <key> <value>`)
 
 | Key              | Default                     | Meaning                                    |
 | ---------------- | --------------------------- | ------------------------------------------ |
-| `WATCH_DIR`      | `~/Movies/squish/clips`     | Folder to watch (use `folder` to change)   |
-| `COMPRESSED_DIR` | `~/Movies/squish/compressed`| Where results go (must be outside the watch folder) |
+| `WATCH_DIR`      | `~/Movies/squish/clips`     | Folder to watch                            |
+| `COMPRESSED_DIR` | `~/Movies/squish/compressed`| Where results go (kept outside the watch folder) |
 | `CRF`            | `23`                        | Quality 0–51, lower = better/bigger        |
 | `PRESET`         | `medium`                    | ffmpeg speed/size tradeoff                 |
 | `AUDIO_BITRATE`  | `128k`                      | Audio bitrate                              |
 | `NOTIFY`         | `1`                         | `0` to silence macOS notifications         |
 
-Settings are validated on write (a bad value is rejected, not saved) and read
-fresh on every run — no reload needed except for `WATCH_DIR` (which is baked into
-the launchd plist, so changing it regenerates and reloads the agent).
+Values are validated on write (a bad value is rejected, not saved) and read fresh
+on every run. Changing `WATCH_DIR` regenerates and reloads the launchd agent,
+since that path is baked into the plist.
 
-### Agent control
-```bash
-squish status                 # config + is the agent loaded?
-squish start | stop | restart
-squish logs                   # last 40 log lines
-squish logs -f                # follow live
-squish uninstall              # unload + remove the agent
-```
-
-### Run by hand
-```bash
-squish run                    # the worker launchd calls; safe to run yourself
-```
+Tab-completion (zsh) completes commands, keys, presets, and folders.
 
 ## Where things live
 
@@ -100,9 +86,10 @@ squish run                    # the worker launchd calls; safe to run yourself
 | ------------- | ---------------------------------------------------------- |
 | CLI (symlink) | `~/bin/squish` → `~/.local/share/squish/squish`            |
 | Installed code| `~/.local/share/squish/` (entry point + `lib/`)            |
-| Watch folder  | `~/Movies/squish/clips` (default; change with `squish folder`) |
+| Watch folder  | `~/Movies/squish/clips` (change with `config set WATCH_DIR`)|
 | Output folder | `~/Movies/squish/compressed/` (one subfolder per video)    |
 | Config        | `~/.config/squish/config`                                  |
+| Completion    | `~/.zsh/completions/_squish`                               |
 | launchd agent | `~/Library/LaunchAgents/com.mahesh.squish.plist`           |
 | Run log       | `~/Library/Logs/squish.log`                                |
 | launchd log   | `~/Library/Logs/squish.launchd.log`                        |
@@ -113,14 +100,16 @@ squish run                    # the worker launchd calls; safe to run yourself
 squish            thin entry point — resolves its path, sources lib/, dispatches
 lib/
   common.sh       constants, paths, output helpers
-  config.sh       load / validate / persist settings
-  agent.sh        launchd plist generation, install/uninstall/status
+  config.sh       load / validate / persist settings (the write side)
+  agent.sh        launchd plist, start/stop, status (the read side)
   worker.sh       the run() compression pass
   cli.sh          help + command dispatch
+completions/
+  _squish         zsh tab-completion
 ```
 
-Adding a feature: write its function in the right `lib/` module, then register a
-line in `cli_main()` and `cmd_help()` in `lib/cli.sh`.
+Adding a command: write its function in the right `lib/` module, then register a
+line in `cli_main()` and `cmd_help()` in `lib/cli.sh` and one in `completions/_squish`.
 
 ## How it works (and why the guards exist)
 
@@ -129,11 +118,12 @@ copying. The `run` worker defends against that:
 
 - **Lock directory** — one run at a time; extra triggers exit immediately.
 - **Size-stability poll** — waits until the file stops growing before encoding.
-- **Already-processed skip** — never re-compresses an existing `_output.mp4`.
+- **Already-processed skip** — never re-compresses a clip that already has output.
 - **Absolute ffmpeg path** — launchd gives the script almost no `PATH`.
+- **Outputs outside the watch folder** — so writing results never re-fires the watcher.
 
 > `Bootstrap failed: 5` when loading means the agent is **already loaded**, not
-> broken. `squish restart` handles the unload/reload for you.
+> broken. Re-running `squish start` handles the unload/reload for you.
 
 ## Roadmap
 

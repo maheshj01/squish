@@ -1,0 +1,45 @@
+#compdef squish
+# zsh tab-completion for squish. Installed to ~/.zsh/completions/_squish by
+# `squish start`. Enable once by adding to ~/.zshrc:
+#   fpath=(~/.zsh/completions $fpath); autoload -Uz compinit; compinit
+
+_squish() {
+  local state line
+  local -a commands
+  commands=(
+    'status:show settings and whether it'\''s watching'
+    'start:start watching (sets up on first run)'
+    'stop:stop watching'
+    'config:change settings — set / reset'
+    'logs:show the run log'
+    'help:show help'
+    'version:print version'
+  )
+
+  _arguments -C '1: :->cmd' '*:: :->args'
+
+  case $state in
+    cmd) _describe 'command' commands ;;
+    args)
+      case $words[1] in
+        config)
+          if (( CURRENT == 2 )); then
+            _values 'action' 'set' 'reset'
+          elif [[ $words[2] == set ]]; then
+            case $CURRENT in
+              3) _values 'key' WATCH_DIR COMPRESSED_DIR CRF PRESET AUDIO_BITRATE NOTIFY ;;
+              4)
+                case $words[3] in
+                  PRESET) _values 'preset' ultrafast superfast veryfast faster fast medium slow slower veryslow placebo ;;
+                  NOTIFY) _values 'notify' 0 1 ;;
+                  WATCH_DIR|COMPRESSED_DIR) _files -/ ;;
+                  *) _message 'value' ;;
+                esac ;;
+            esac
+          fi ;;
+        logs) _values 'option' '-f' ;;
+      esac ;;
+  esac
+}
+
+_squish "$@"

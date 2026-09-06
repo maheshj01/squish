@@ -75,21 +75,11 @@ validate() {
 }
 
 # `config <show|get|set|reset|path>`
+# The write side. Reading is `status`, so config only writes: `set` and `reset`.
 cmd_config() {
   load_config
-  local sub="${1:-show}"; shift || true
+  local sub="${1:-}"; shift || true
   case "$sub" in
-    show|"")
-      local src="defaults (no config file yet)"
-      [[ -f "$CONFIG_FILE" ]] && src="$CONFIG_FILE"
-      info "${c_dim}source: $src${c_reset}"
-      local k
-      for k in "${KEYS[@]}"; do printf '%s%-14s%s %s\n' "$c_bold" "$k" "$c_reset" "${!k}"; done
-      ;;
-    get)
-      local k="${1:?usage: $APP config get KEY}"
-      case " ${KEYS[*]} " in *" $k "*) printf '%s\n' "${!k}" ;; *) die "unknown key: $k" ;; esac
-      ;;
     set)
       local k="${1:?usage: $APP config set KEY VALUE}" raw="${2:?usage: $APP config set KEY VALUE}"
       case " ${KEYS[*]} " in *" $k "*) ;; *) die "unknown key: $k (valid: ${KEYS[*]})" ;; esac
@@ -110,19 +100,9 @@ cmd_config() {
       CRF="$DEFAULT_CRF"; PRESET="$DEFAULT_PRESET"
       AUDIO_BITRATE="$DEFAULT_AUDIO_BITRATE"; NOTIFY="$DEFAULT_NOTIFY"
       save_config
-      ok "config reset to defaults"
-      cmd_config show
+      ok "config reset to defaults (run '$APP status' to see them)"
       reload_if_installed "config reset"
       ;;
-    path) say "$CONFIG_FILE" ;;
-    *) die "unknown config subcommand: $sub (show|get|set|reset|path)" ;;
+    ""|*) die "usage: $APP config set KEY VALUE   |   $APP config reset" ;;
   esac
-}
-
-# `folder [PATH]` — friendly alias for reading/setting WATCH_DIR.
-cmd_folder() {
-  load_config
-  local new="${1:-}"
-  [[ -n "$new" ]] || { info "current watch folder: $WATCH_DIR"; return 0; }
-  cmd_config set WATCH_DIR "$new"
 }

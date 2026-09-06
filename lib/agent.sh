@@ -52,7 +52,8 @@ reload_if_installed() {
   write_plist; agent_unload; agent_load
 }
 
-# Copy the whole project (entry + lib) to $INSTALL_DIR and symlink it onto PATH.
+# Copy the project (entry + lib + completion) to $INSTALL_DIR, symlink it onto
+# PATH, and drop the zsh completion into place. Idempotent — safe to re-run.
 _sync_code() {
   mkdir -p "$INSTALL_DIR/lib"
   cp "$SQUISH_ROOT/$APP" "$INSTALL_DIR/$APP"
@@ -60,42 +61,45 @@ _sync_code() {
   chmod +x "$INSTALL_DIR/$APP"
   mkdir -p "$(dirname "$BIN_LINK")"
   ln -sf "$INSTALL_DIR/$APP" "$BIN_LINK"
+  if [[ -f "$SQUISH_ROOT/completions/_$APP" ]]; then
+    mkdir -p "$COMPLETION_DIR"
+    cp "$SQUISH_ROOT/completions/_$APP" "$COMPLETION_DIR/_$APP"
+  fi
 }
 
-cmd_install() {
+# start = get everything in place (first run) and begin watching.
+cmd_start() {
   load_config
   _sync_code
-  mkdir -p "$WATCH_DIR"
+  mkdir -p "$WATCH_DIR" "$COMPRESSED_DIR"
   write_plist; agent_unload; agent_load
-  ok "installed."
-  info "  cli:   $BIN_LINK -> $INSTALL_DIR/$APP"
-  info "  agent: $PLIST"
-  info "  watch: $WATCH_DIR"
-  is_loaded && ok "agent is loaded and watching." || warn "agent did not load — check: $LAUNCHD_LOG"
-  case ":$PATH:" in *":$(dirname "$BIN_LINK"):"*) ;; *) warn "note: $(dirname "$BIN_LINK") is not on your PATH — add it to ~/.zshrc";; esac
+  is_loaded && ok "watching $WATCH_DIR" || warn "agent did not load — check: $LAUNCHD_LOG"
+  case ":$PATH:" in *":$(dirname "$BIN_LINK"):"*) ;;
+    *) warn "note: $(dirname "$BIN_LINK") is not on PATH — add:  export PATH=\"\$HOME/bin:\$PATH\"  to ~/.zshrc";; esac
+  case ":${FPATH:-}:" in *":$COMPLETION_DIR:"*) ;;
+    *) [[ -f "$COMPLETION_DIR/_$APP" ]] && info "${c_dim}tab-completion: add  fpath=($COMPLETION_DIR \$fpath); autoload -Uz compinit; compinit  to ~/.zshrc${c_reset}";; esac
 }
 
-cmd_uninstall() {
+# stop = stop watching (agent unloaded, plist removed). Code + config stay.
+cmd_stop() {
   agent_unload
   rm -f "$PLIST"
-  ok "agent unloaded and plist removed."
-  info "  (code at $INSTALL_DIR, symlink $BIN_LINK, and config were left in place)"
+  ok "stopped watching."
 }
 
 cmd_status() {
   load_config
+  local watching; is_loaded && watching="${c_grn}yes${c_reset}" || watching="${c_yel}no — run: $APP start${c_reset}"
+  printf '%swatching%s       %s\n' "$c_bold" "$c_reset" "$watching"
   printf '%swatch folder%s   %s\n' "$c_bold" "$c_reset" "$WATCH_DIR"
   printf '%soutput folder%s  %s\n' "$c_bold" "$c_reset" "$COMPRESSED_DIR"
-  printf '%sconfig file%s    %s\n' "$c_bold" "$c_reset" "$([[ -f "$CONFIG_FILE" ]] && echo "$CONFIG_FILE" || echo "(defaults)")"
+  printf '%sCRF%s            %s\n' "$c_bold" "$c_reset" "$CRF"
+  printf '%sPRESET%s         %s\n' "$c_bold" "$c_reset" "$PRESET"
+  printf '%sAUDIO_BITRATE%s  %s\n' "$c_bold" "$c_reset" "$AUDIO_BITRATE"
+  printf '%sNOTIFY%s         %s\n' "$c_bold" "$c_reset" "$NOTIFY"
+  printf '%sconfig%s         %s\n' "$c_bold" "$c_reset" "$([[ -f "$CONFIG_FILE" ]] && echo "$CONFIG_FILE" || echo "(defaults)")"
   printf '%srun log%s        %s\n' "$c_bold" "$c_reset" "$RUN_LOG"
-  printf '%sinstalled%s      %s\n' "$c_bold" "$c_reset" "$([[ -x "$INSTALL_DIR/$APP" ]] && echo "$INSTALL_DIR/$APP" || echo "no")"
-  printf '%splist%s          %s\n' "$c_bold" "$c_reset" "$(is_installed && echo "$PLIST" || echo "not installed")"
-  printf '%sagent loaded%s   %s\n' "$c_bold" "$c_reset" "$(is_loaded && echo yes || echo no)"
 }
-
-cmd_start()   { is_installed || die "not installed — run: $APP install"; agent_load;   ok "agent loaded."; }
-cmd_stop()    { agent_unload; ok "agent unloaded."; }
-cmd_restart() { is_installed || die "not installed — run: $APP install"; agent_unload; agent_load; ok "agent reloaded."; }
 
 cmd_logs() {
   [[ -f "$RUN_LOG" ]] || die "no log yet at $RUN_LOG"
