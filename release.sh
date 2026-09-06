@@ -41,7 +41,7 @@ fi
 git push origin HEAD
 
 # ---- 2) tag + push --------------------------------------------------------
-git tag "$tag"
+git tag "$tag" -m "Release $ver"
 git push origin "$tag"
 
 # ---- 3) hash the release tarball (retry: GitHub may lag a moment) ---------
