@@ -30,10 +30,12 @@ agent is silently denied there. The run log lives at `~/Library/Logs/squish.log`
 
 ## Install
 
-**Homebrew** (recommended once the tap is published):
+**Homebrew** (recommended):
 
 ```bash
-brew install maheshj01/tap/squish   # or: brew install --HEAD ...
+brew install maheshj01/tap/squish          # latest tagged release
+# or the latest main, no release needed:
+brew install --HEAD maheshj01/tap/squish
 squish start
 ```
 
