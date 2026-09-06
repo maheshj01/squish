@@ -192,21 +192,24 @@ maheshj01/homebrew-tap    the tap  — Formula/squish.rb, later Formula/<next>.r
 
 ### Releasing a new version
 
-1. Bump `VERSION` in `lib/common.sh`, then commit and push.
-2. Tag the source and push the tag (keep it in sync with `VERSION`):
-   ```bash
-   git tag v0.2.0 && git push --tags
-   ```
-3. Hash the release tarball:
-   ```bash
-   curl -sL https://github.com/maheshj01/squish/archive/refs/tags/v0.2.0.tar.gz | shasum -a 256
-   ```
-4. In the **homebrew-tap** repo, update `Formula/squish.rb` — the `url` tag and
-   the `sha256` from step 3 — then commit and push.
-5. Users upgrade with:
-   ```bash
-   brew update && brew upgrade squish
-   ```
+One command does it all — bump `VERSION`, commit, tag + push the source, hash the
+tarball, then update and push the tap formula:
+
+```bash
+./release.sh 0.2.0
+```
+
+It expects the tap repo beside this one (`../homebrew-tap`); override with
+`TAP_DIR=/path/to/homebrew-tap ./release.sh 0.2.0`. Users then upgrade with
+`brew update && brew upgrade squish`.
+
+<details><summary>What it does, by hand</summary>
+
+1. Bump `VERSION` in `lib/common.sh`; commit and push.
+2. `git tag v0.2.0 && git push --tags`.
+3. `curl -sL …/v0.2.0.tar.gz | shasum -a 256`.
+4. In **homebrew-tap**, set `Formula/squish.rb`'s `url` tag and `sha256`; push.
+</details>
 
 Test changes from `main` before tagging: `brew install --HEAD maheshj01/tap/squish`.
 
