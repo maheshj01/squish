@@ -74,6 +74,7 @@ The surface is deliberately small: **read state with `status`, change it with
 
 ```bash
 squish status              # settings + whether it's watching (the read view)
+squish compress <file>    # compress one file now, prints the output path
 squish start              # start watching (sets everything up on first run)
 squish stop               # stop watching
 squish config set CRF 20  # change a setting
@@ -88,6 +89,20 @@ squish version
 
 `clean` shows what it will delete and asks for a `y/N` confirmation first; the
 `clips/` and `compressed/` folders themselves are kept, only their contents go.
+
+### One-shot compression
+
+`compress` handles a single file synchronously — no watch folder needed — and
+prints the output path to stdout (handy for scripts and agents):
+
+```bash
+squish compress ~/Desktop/demo.mov                 # -> ~/Movies/squish/compressed/demo/demo.mp4
+squish compress demo.mov --destination ~/out       # -> ~/out/demo.mp4  (+ demo.log)
+squish compress demo.mov --destination ~/out/small.mp4   # exact output path
+```
+
+Without `--destination` it uses the same `compressed/<name>/` layout as the
+watcher. Progress and the size summary go to stderr; stdout is only the path.
 
 ### Settings (`config set <key> <value>`)
 
@@ -134,7 +149,7 @@ lib/
   common.sh       app identity, launchd + runtime paths, output helpers
   config.sh       load / validate / persist settings (the write side)
   agent.sh        launchd plist, start/stop, status (the read side)
-  worker.sh       the run() compression pass
+  worker.sh       compression — the watch pass (run) and one-shot (compress)
   clean.sh        empty the clips / compressed folders (with confirm)
   cli.sh          help + command dispatch
 completions/

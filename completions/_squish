@@ -8,6 +8,7 @@ _squish() {
   local -a commands
   commands=(
     'status:show settings and whether it'\''s watching'
+    'compress:compress one file now'
     'start:start watching (sets up on first run)'
     'stop:stop watching'
     'config:change settings — set / reset'
@@ -38,6 +39,11 @@ _squish() {
                 esac ;;
             esac
           fi ;;
+        compress)
+          case $words[CURRENT] in
+            -*) _values 'option' '--destination' ;;
+            *)  [[ $words[CURRENT-1] == (-d|--destination) ]] && _files -/ || _files ;;
+          esac ;;
         clean) (( CURRENT == 2 )) && _values 'target' 'clips' 'compressed' ;;
         logs) _values 'option' '-f' ;;
       esac ;;

@@ -1,22 +1,104 @@
 #!/bin/bash
-# worker.sh — the compression pass launchd triggers (and you can run by hand).
-#
-# Originals are never touched. Output goes to <watch>/outputs/<name>_output.mp4.
-# The guards exist because launchd's WatchPaths is blunt: it fires repeatedly
-# during a single copy, and before the file has finished writing.
+# worker.sh — the compression itself: the launchd watch pass (cmd_run) and the
+# synchronous one-shot (cmd_compress). Both share the helpers below so the
+# encode settings and behaviour stay identical. Originals are never touched.
 
+# bytes -> human size, e.g. "6.4 MB" / "812 KB"
+_human() { awk -v b="$1" 'BEGIN{ if(b>=1048576) printf "%.1f MB",b/1048576; else printf "%.0f KB",b/1024 }'; }
+
+# Is this extension one we compress?
+_is_video() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    mov|mp4|m4v|avi|mkv|webm|mpg|mpeg|wmv|flv) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Echo the ffmpeg path, or return 1. launchd gives us almost no PATH, so we look
+# in the usual Homebrew locations before falling back to PATH.
+_find_ffmpeg() {
+  local c
+  for c in /opt/homebrew/bin/ffmpeg /usr/local/bin/ffmpeg "$(command -v ffmpeg 2>/dev/null)"; do
+    [[ -x "$c" ]] && { printf '%s' "$c"; return 0; }
+  done
+  return 1
+}
+
+# Encode SRC -> DST (mp4), ffmpeg output to FFLOG, using ffmpeg at FFMPEG.
+# Writes to a hidden temp file and moves it into place, so DST is never partial.
+# Uses CRF / PRESET / AUDIO_BITRATE from the loaded config.
+_encode() {
+  local src="$1" dst="$2" fflog="$3" ffmpeg="$4"
+  # temp keeps an .mp4 extension AND we pass -f mp4, so ffmpeg always knows the
+  # container regardless of the destination's name.
+  local tmp; tmp="$(dirname "$dst")/.$(basename "$dst").partial.mp4"
+  mkdir -p "$(dirname "$dst")" "$(dirname "$fflog")"
+  rm -f "$tmp"
+  if "$ffmpeg" -nostdin -y -i "$src" \
+       -c:v libx264 -crf "$CRF" -preset "$PRESET" -pix_fmt yuv420p \
+       -c:a aac -b:a "$AUDIO_BITRATE" -movflags +faststart \
+       -f mp4 "$tmp" > "$fflog" 2>&1
+  then mv -f "$tmp" "$dst"; return 0
+  else local rc=$?; rm -f "$tmp"; return "$rc"; fi
+}
+
+# ==========================================================================
+# compress — one file, synchronously. Prints the output path on stdout.
+#   squish compress <file> [--destination DIR|FILE.mp4]
+# Without --destination it lands in COMPRESSED_DIR/<name>/<name>.mp4, same as
+# the watcher. Human messages go to stderr; stdout is just the output path.
+# ==========================================================================
+cmd_compress() {
+  load_config
+  local src="" dest=""
+  while (( $# )); do
+    case "$1" in
+      -d|--destination) dest="${2:?--destination needs a path}"; shift 2 ;;
+      --destination=*)  dest="${1#*=}"; shift ;;
+      -h|--help)        info "usage: $APP compress <file> [--destination DIR]"; return 0 ;;
+      -*)               die "unknown option: $1 (usage: $APP compress <file> [--destination DIR])" ;;
+      *) [[ -z "$src" ]] && src="$1" || die "one file at a time (usage: $APP compress <file> [--destination DIR])"; shift ;;
+    esac
+  done
+
+  [[ -n "$src" ]] || die "usage: $APP compress <file> [--destination DIR]"
+  [[ -f "$src" ]] || die "no such file: $src"
+  local name base ext; name="$(basename "$src")"; base="${name%.*}"; ext="${name##*.}"
+  _is_video "$ext" || die "not a video file: .$ext"
+
+  local ffmpeg; ffmpeg="$(_find_ffmpeg)" || die "ffmpeg not found — brew install ffmpeg"
+
+  local dst fflog
+  if [[ -n "$dest" ]]; then
+    case "$dest" in "~"/*) dest="$HOME/${dest#\~/}" ;; "~") dest="$HOME" ;; esac
+    if [[ "$dest" == *.mp4 ]]; then dst="$dest"; else dst="${dest%/}/${base}.mp4"; fi
+  else
+    dst="$COMPRESSED_DIR/$base/${base}.mp4"     # default: same layout as the watcher
+  fi
+  fflog="${dst%.mp4}.log"
+
+  local before after pct
+  before="$(stat -f%z "$src")"
+  info "compressing $name ($(_human "$before")) → $dst"
+  if _encode "$src" "$dst" "$fflog" "$ffmpeg"; then
+    after="$(stat -f%z "$dst")"; pct=$(( 100 - (after * 100 / before) ))
+    ok "done — $(_human "$before") → $(_human "$after")  (${pct}% smaller)"
+    say "$dst"                                   # stdout: the output path
+  else
+    die "ffmpeg failed — see $fflog"
+  fi
+}
+
+# ==========================================================================
+# run — the watch pass launchd triggers (and you can run by hand).
+# ==========================================================================
 cmd_run() {
   load_config
-  # Results live OUTSIDE the watch folder — writing inside it would re-fire
-  # WatchPaths and loop the agent. Each video gets its own subfolder under
-  # COMPRESSED_DIR (the compressed file + its ffmpeg log). The run log lives
-  # under ~/Library/Logs.
   local OUT_DIR="$COMPRESSED_DIR"
   local LOG="$RUN_LOG"
   mkdir -p "$OUT_DIR" "$(dirname "$LOG")"
 
   log() { printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*" >> "$LOG"; }
-  human() { awk -v b="$1" 'BEGIN{ if(b>=1048576) printf "%.1f MB",b/1048576; else printf "%.0f KB",b/1024 }'; }
   notify() {
     (( NOTIFY )) || return 0
     local t=${1//\\/\\\\}; t=${t//\"/\\\"}; local m=${2//\\/\\\\}; m=${m//\"/\\\"}
@@ -25,15 +107,10 @@ cmd_run() {
 
   log "──── run started (pid $$, user $(whoami)) ────"
 
-  # ffmpeg — launchd gives us almost no PATH, so look in the usual places.
-  local FFMPEG="" c
-  for c in /opt/homebrew/bin/ffmpeg /usr/local/bin/ffmpeg "$(command -v ffmpeg 2>/dev/null)"; do
-    [[ -x "$c" ]] && { FFMPEG="$c"; break; }
-  done
-  if [[ -z "$FFMPEG" ]]; then
+  local FFMPEG; FFMPEG="$(_find_ffmpeg)" || {
     log "FATAL: ffmpeg not found. fix: brew install ffmpeg"
     notify "Compression error" "ffmpeg not found"; return 1
-  fi
+  }
   log "ffmpeg: $FFMPEG   (crf=$CRF preset=$PRESET audio=$AUDIO_BITRATE)"
 
   [[ -d "$WATCH_DIR" ]] || { log "FATAL: watch dir missing: $WATCH_DIR"; return 1; }
@@ -59,39 +136,29 @@ cmd_run() {
   }
 
   shopt -s nullglob nocaseglob
-  local candidates=0 processed=0 src name ext base clip_dir dst tmp fflog before after pct
+  local candidates=0 processed=0 src name ext base clip_dir dst fflog before after pct
   for src in "$WATCH_DIR"/*; do
     [[ -f "$src" ]] || continue
     name=$(basename "$src"); ext="${name##*.}"; base="${name%.*}"
     case "$name" in .DS_Store|.*) continue ;; esac
-    case "$(echo "$ext" | tr '[:upper:]' '[:lower:]')" in
-      mov|mp4|m4v|avi|mkv|webm|mpg|mpeg|wmv|flv) ;;
-      *) log "skip '$name': .$ext is not a video type"; continue ;;
-    esac
+    _is_video "$ext" || { log "skip '$name': .$ext is not a video type"; continue; }
     candidates=$(( candidates + 1 ))
     # each video gets its own subfolder: compressed/<base>/{<base>.mp4,<base>.log}
-    clip_dir="$OUT_DIR/$base"; dst="$clip_dir/${base}.mp4"
+    clip_dir="$OUT_DIR/$base"; dst="$clip_dir/${base}.mp4"; fflog="$clip_dir/${base}.log"
     [[ -e "$dst" ]] && { log "skip '$name': already compressed"; continue; }
 
     log "FOUND: $name"
     wait_until_stable "$src" || { log "skip '$name': file never settled"; continue; }
 
-    mkdir -p "$clip_dir"
-    tmp="$clip_dir/.${base}.partial.mp4"; fflog="$clip_dir/${base}.log"; rm -f "$tmp"
     before=$(stat -f%z "$src")
-    log "encoding '$name' ($(human "$before")) -> compressed/$base/$(basename "$dst")"
+    log "encoding '$name' ($(_human "$before")) -> compressed/$base/$(basename "$dst")"
     log "  ffmpeg output: $fflog"
-    if "$FFMPEG" -nostdin -y -i "$src" \
-         -c:v libx264 -crf "$CRF" -preset "$PRESET" -pix_fmt yuv420p \
-         -c:a aac -b:a "$AUDIO_BITRATE" -movflags +faststart \
-         "$tmp" > "$fflog" 2>&1
-    then
-      mv -f "$tmp" "$dst"; after=$(stat -f%z "$dst"); pct=$(( 100 - (after * 100 / before) ))
-      log "OK: $(basename "$dst") — $(human "$after"), ${pct}% smaller"
+    if _encode "$src" "$dst" "$fflog" "$FFMPEG"; then
+      after=$(stat -f%z "$dst"); pct=$(( 100 - (after * 100 / before) ))
+      log "OK: $(basename "$dst") — $(_human "$after"), ${pct}% smaller"
       notify "Compression done" "$base — ${pct}% smaller"; processed=$(( processed + 1 ))
     else
-      local rc=$?; rm -f "$tmp"
-      log "FAILED: '$name' — ffmpeg exit $rc. Last lines:"
+      log "FAILED: '$name' — ffmpeg error. Last lines:"
       tail -5 "$fflog" 2>/dev/null | sed 's/^/    /' >> "$LOG"
       notify "Compression failed" "$base"
     fi
