@@ -76,10 +76,16 @@ squish start              # start watching (sets everything up on first run)
 squish stop               # stop watching
 squish config set CRF 20  # change a setting
 squish config reset       # restore defaults
+squish clean              # empty clips AND compressed (asks y/N)
+squish clean clips        # empty only the watched inputs
+squish clean compressed   # empty only the compressed outputs
 squish logs               # last 40 log lines   (squish logs -f to follow)
 squish help
 squish version
 ```
+
+`clean` shows what it will delete and asks for a `y/N` confirmation first; the
+`clips/` and `compressed/` folders themselves are kept, only their contents go.
 
 ### Settings (`config set <key> <value>`)
 
@@ -127,6 +133,7 @@ lib/
   config.sh       load / validate / persist settings (the write side)
   agent.sh        launchd plist, start/stop, status (the read side)
   worker.sh       the run() compression pass
+  clean.sh        empty the clips / compressed folders (with confirm)
   cli.sh          help + command dispatch
 completions/
   _squish         zsh tab-completion

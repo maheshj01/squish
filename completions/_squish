@@ -11,6 +11,7 @@ _squish() {
     'start:start watching (sets up on first run)'
     'stop:stop watching'
     'config:change settings — set / reset'
+    'clean:empty the clips and/or compressed folders'
     'logs:show the run log'
     'help:show help'
     'version:print version'
@@ -37,6 +38,7 @@ _squish() {
                 esac ;;
             esac
           fi ;;
+        clean) (( CURRENT == 2 )) && _values 'target' 'clips' 'compressed' ;;
         logs) _values 'option' '-f' ;;
       esac ;;
   esac

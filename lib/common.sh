@@ -55,3 +55,12 @@ info() { printf '%s\n' "$*" >&2; }                               # stderr: chatt
 ok()   { printf '%s%s%s\n' "$c_grn" "$*" "$c_reset" >&2; }
 warn() { printf '%s%s%s\n' "$c_yel" "$*" "$c_reset" >&2; }
 die()  { printf '%s%s%s\n' "$c_red" "$*" "$c_reset" >&2; exit 1; }
+
+# Ask a y/N question; returns 0 only for an explicit yes. Reads one line from
+# stdin, so a piped "y" works too. Defaults to No on EOF (e.g. no terminal).
+confirm() {
+  local reply
+  printf '%s%s%s [y/N] ' "$c_yel" "$*" "$c_reset" >&2
+  read -r reply || return 1
+  [[ "$reply" == [yY] || "$reply" == [yY][eE][sS] ]]
+}

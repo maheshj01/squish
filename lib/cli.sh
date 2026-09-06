@@ -18,6 +18,7 @@ ${c_bold}usage:${c_reset} $APP <command>
   ${c_bold}stop${c_reset}                stop watching
   ${c_bold}config set${c_reset} K V      change a setting
   ${c_bold}config reset${c_reset}        restore defaults
+  ${c_bold}clean${c_reset} [clips|compressed]  empty the folders (asks y/N; both if unspecified)
   ${c_bold}logs${c_reset} [N|-f]         show the run log (last N lines, or follow)
   ${c_bold}help${c_reset}                show this
   ${c_bold}version${c_reset}             print version
@@ -34,6 +35,7 @@ cli_main() {
     start)                cmd_start "$@" ;;
     stop)                 cmd_stop "$@" ;;
     config)               cmd_config "$@" ;;
+    clean)                cmd_clean "$@" ;;
     logs)                 cmd_logs "$@" ;;
     run)                  cmd_run "$@" ;;          # internal: launchd calls this
     version|-v|--version) cmd_version ;;
