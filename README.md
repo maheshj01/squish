@@ -47,7 +47,7 @@ squish start
 ## Upgrade
 
 ```zsh
-brew upgrade maheshj01/tap/squish
+brew update && brew upgrade squish
 ```
 
 **Manual / from a clone:**
