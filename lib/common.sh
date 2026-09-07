@@ -5,7 +5,7 @@
 # global on purpose; keep it dependency-free so other modules can rely on it.
 
 APP="squish"
-VERSION="0.2.0"
+VERSION="0.2.1"
 LABEL="com.mahesh.squish"
 
 # ---- launchd paths --------------------------------------------------------
