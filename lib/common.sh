@@ -37,9 +37,14 @@ DEFAULT_CRF=23
 DEFAULT_PRESET=medium
 DEFAULT_AUDIO_BITRATE=128k
 DEFAULT_NOTIFY=1
+# GIF settings used by `squish convert` (video -> gif). Width scales, height auto.
+# GIF_DIR is where `convert` writes when --destination is omitted.
+DEFAULT_GIF_DIR="$HOME/Movies/squish/gifs"
+DEFAULT_GIF_FPS=12
+DEFAULT_GIF_WIDTH=640
 
 # recognised config keys, in display order
-KEYS=(WATCH_DIR COMPRESSED_DIR CRF PRESET AUDIO_BITRATE NOTIFY)
+KEYS=(WATCH_DIR COMPRESSED_DIR CRF PRESET AUDIO_BITRATE NOTIFY GIF_DIR GIF_FPS GIF_WIDTH)
 
 # ---- output helpers -------------------------------------------------------
 # Colours only when stderr is a TTY, so piped/logged output stays clean.

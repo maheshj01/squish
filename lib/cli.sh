@@ -15,6 +15,7 @@ ${c_bold}usage:${c_reset} $APP <command>
 
   ${c_bold}status${c_reset}              show active status and configuration
   ${c_bold}compress${c_reset} <file>     compress one file now [--destination DIR]
+  ${c_bold}convert${c_reset} <file>      convert one file to a gif [--destination DIR]
   ${c_bold}start${c_reset}               start watching (sets everything up on first run)
   ${c_bold}stop${c_reset}                stop watching
   ${c_bold}config set${c_reset} K V      change a setting
@@ -34,6 +35,7 @@ cli_main() {
   case "$cmd" in
     status)               cmd_status "$@" ;;
     compress)             cmd_compress "$@" ;;
+    convert)              cmd_convert "$@" ;;
     start)                cmd_start "$@" ;;
     stop)                 cmd_stop "$@" ;;
     config)               cmd_config "$@" ;;

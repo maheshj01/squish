@@ -97,6 +97,20 @@ _encode() {
   else local rc=$?; rm -f "$tmp"; return "$rc"; fi
 }
 
+# Convert SRC -> DST (animated gif) with the palettegen/paletteuse pipeline for
+# good colour, at GIF_FPS / GIF_WIDTH from config. Atomic via a temp file.
+_gif() {
+  local src="$1" dst="$2" fflog="$3" ffmpeg="$4"
+  local tmp; tmp="$(dirname "$dst")/.$(basename "$dst").partial.gif"
+  mkdir -p "$(dirname "$dst")" "$(dirname "$fflog")"
+  rm -f "$tmp"
+  if "$ffmpeg" -nostdin -y -i "$src" \
+       -vf "fps=$GIF_FPS,scale=$GIF_WIDTH:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+       -loop 0 -f gif "$tmp" > "$fflog" 2>&1
+  then mv -f "$tmp" "$dst"; return 0
+  else local rc=$?; rm -f "$tmp"; return "$rc"; fi
+}
+
 # ==========================================================================
 # compress — one file, synchronously. Prints the output path on stdout.
 #   squish compress <file> [--destination DIR|FILE.mp4]
@@ -139,6 +153,53 @@ cmd_compress() {
     after="$(stat -f%z "$dst")"; pct=$(( 100 - (after * 100 / before) ))
     ok "done — $(_human "$before") → $(_human "$after")  (${pct}% smaller)"
     say "$dst"                                   # stdout: the output path
+  else
+    die "ffmpeg failed — see $fflog"
+  fi
+}
+
+# ==========================================================================
+# convert — one file to an animated GIF, synchronously. Prints output path.
+#   squish convert <file> [--destination DIR|FILE.gif]
+# Uses GIF_FPS / GIF_WIDTH from config; default output GIF_DIR/<name>.gif.
+# This is manual only — the watcher never auto-converts to gif.
+# ==========================================================================
+cmd_convert() {
+  load_config
+  local src="" dest=""
+  while (( $# )); do
+    case "$1" in
+      -d|--destination) dest="${2:?--destination needs a path}"; shift 2 ;;
+      --destination=*)  dest="${1#*=}"; shift ;;
+      -h|--help)        info "usage: $APP convert <file> [--destination DIR]"; return 0 ;;
+      -*)               die "unknown option: $1 (usage: $APP convert <file> [--destination DIR])" ;;
+      *) [[ -z "$src" ]] && src="$1" || die "one file at a time (usage: $APP convert <file> [--destination DIR])"; shift ;;
+    esac
+  done
+
+  [[ -n "$src" ]] || die "usage: $APP convert <file> [--destination DIR]"
+  [[ -f "$src" ]] || die "no such file: $src"
+  local name base ext; name="$(basename "$src")"; base="${name%.*}"; ext="${name##*.}"
+  _is_video "$ext" || die "not a video file: .$ext"
+
+  local ffmpeg; ffmpeg="$(_find_ffmpeg)" || die "ffmpeg not found — brew install ffmpeg"
+
+  local dst fflog
+  if [[ -n "$dest" ]]; then
+    case "$dest" in "~"/*) dest="$HOME/${dest#\~/}" ;; "~") dest="$HOME" ;; esac
+    if [[ "$dest" == *.gif ]]; then dst="$dest"; else dst="${dest%/}/${base}.gif"; fi
+  else
+    dst="$GIF_DIR/${base}.gif"                    # default: ~/Movies/squish/gifs/<name>.gif
+  fi
+  fflog="${dst%.gif}.gif.log"                     # the ffmpeg log sits beside the gif
+
+  local before after
+  before="$(stat -f%z "$src")"
+  info "converting $name → gif (${GIF_WIDTH}px, ${GIF_FPS}fps) → $dst"
+  if _gif "$src" "$dst" "$fflog" "$ffmpeg"; then
+    after="$(stat -f%z "$dst")"
+    ok "done — $(_human "$before") → $(_human "$after") gif"
+    say "$dst"                                    # stdout: the output path
   else
     die "ffmpeg failed — see $fflog"
   fi

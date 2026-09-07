@@ -85,6 +85,9 @@ cmd_status() {
   printf '%sPRESET%s         %s\n' "$c_bold" "$c_reset" "$PRESET"
   printf '%sAUDIO_BITRATE%s  %s\n' "$c_bold" "$c_reset" "$AUDIO_BITRATE"
   printf '%sNOTIFY%s         %s\n' "$c_bold" "$c_reset" "$NOTIFY"
+  printf '%sGIF_DIR%s        %s\n' "$c_bold" "$c_reset" "$GIF_DIR"
+  printf '%sGIF_FPS%s        %s\n' "$c_bold" "$c_reset" "$GIF_FPS"
+  printf '%sGIF_WIDTH%s      %s\n' "$c_bold" "$c_reset" "$GIF_WIDTH"
   printf '%sconfig%s         %s\n' "$c_bold" "$c_reset" "$([[ -f "$CONFIG_FILE" ]] && echo "$CONFIG_FILE" || echo "(defaults)")"
   printf '%srun log%s        %s\n' "$c_bold" "$c_reset" "$RUN_LOG"
 }

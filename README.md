@@ -11,10 +11,12 @@ Typical result: a screen recording drops ~90% in size in a few seconds.
 ~/Movies/squish/
 ├── clips/                     drop videos here (the watch folder; untouched)
 │   └── my-clip.mov
-└── compressed/                one subfolder per video
-    └── my-clip/
-        ├── my-clip.mp4        compressed result
-        └── my-clip.log        its ffmpeg log
+├── compressed/                one subfolder per video
+│   └── my-clip/
+│       ├── my-clip.mp4        compressed result
+│       └── my-clip.log        its ffmpeg log
+└── gifs/                      `squish convert` output (manual only)
+    └── my-clip.gif
 ```
 
 `compressed/` is a sibling of `clips/`, i.e. **outside** the watched folder, on
@@ -40,6 +42,12 @@ brew install maheshj01/tap/squish          # latest tagged release
 # or the latest main, no release needed:
 brew install --HEAD maheshj01/tap/squish
 squish start
+```
+
+## Upgrade
+
+```zsh
+brew upgrade maheshj01/tap/squish
 ```
 
 **Manual / from a clone:**
@@ -78,6 +86,7 @@ The surface is deliberately small: **read state with `status`, change it with
 ```bash
 squish status              # settings + whether it's watching (the read view)
 squish compress <file>    # compress one file now, prints the output path
+squish convert <file>     # convert one file to a gif (manual only)
 squish start              # start watching (sets everything up on first run)
 squish stop               # stop watching
 squish config set CRF 20  # change a setting
@@ -107,16 +116,34 @@ squish compress demo.mov --destination ~/out/small.mp4   # exact output path
 Without `--destination` it uses the same `compressed/<name>/` layout as the
 watcher. Progress and the size summary go to stderr; stdout is only the path.
 
+### Convert to GIF
+
+`convert` turns a video into an animated GIF (palettegen/paletteuse for good
+colour). It's **manual only** — the watcher never auto-converts to GIF:
+
+```bash
+squish convert ~/Desktop/demo.mov                 # -> ~/Movies/squish/gifs/demo.gif
+squish convert demo.mov --destination ~/out       # -> ~/out/demo.gif
+squish convert demo.mov --destination ~/out/x.gif # exact output path
+```
+
+Without `--destination`, GIFs land in `GIF_DIR` (`~/Movies/squish/gifs/` by
+default) — a sibling of `clips/` and `compressed/`. Size and frame-rate come from
+the `GIF_WIDTH` / `GIF_FPS` settings below.
+
 ### Settings (`config set <key> <value>`)
 
-| Key              | Default                     | Meaning                                    |
-| ---------------- | --------------------------- | ------------------------------------------ |
-| `WATCH_DIR`      | `~/Movies/squish/clips`     | Folder to watch                            |
-| `COMPRESSED_DIR` | `~/Movies/squish/compressed`| Where results go (kept outside the watch folder) |
-| `CRF`            | `23`                        | Quality 0–51, lower = better/bigger        |
-| `PRESET`         | `medium`                    | ffmpeg speed/size tradeoff                 |
-| `AUDIO_BITRATE`  | `128k`                      | Audio bitrate                              |
-| `NOTIFY`         | `1`                         | `0` to silence macOS notifications         |
+| Key              | Default                      | Meaning                                          |
+| ---------------- | ---------------------------- | ------------------------------------------------ |
+| `WATCH_DIR`      | `~/Movies/squish/clips`      | Folder to watch                                  |
+| `COMPRESSED_DIR` | `~/Movies/squish/compressed` | Where results go (kept outside the watch folder) |
+| `CRF`            | `23`                         | Quality 0–51, lower = better/bigger              |
+| `PRESET`         | `medium`                     | ffmpeg speed/size tradeoff                       |
+| `AUDIO_BITRATE`  | `128k`                       | Audio bitrate                                    |
+| `NOTIFY`         | `1`                          | `0` to silence macOS notifications               |
+| `GIF_DIR`        | `~/Movies/squish/gifs`       | Where `convert` writes GIFs (no `--destination`) |
+| `GIF_FPS`        | `12`                         | GIF frame rate (1–60), used by `convert`         |
+| `GIF_WIDTH`      | `640`                        | GIF width in px (height auto), used by `convert` |
 
 Values are validated on write (a bad value is rejected, not saved) and read fresh
 on every run. Changing `WATCH_DIR` regenerates and reloads the launchd agent,
@@ -128,21 +155,21 @@ Tab-completion (zsh) completes commands, keys, presets, and folders.
 
 Runtime files (created/managed by `squish`, same for every install method):
 
-| Thing         | Path                                                       |
-| ------------- | ---------------------------------------------------------- |
-| Watch folder  | `~/Movies/squish/clips` (change with `config set WATCH_DIR`)|
-| Output folder | `~/Movies/squish/compressed/` (one subfolder per video)    |
-| Config        | `~/.config/squish/config`                                  |
-| launchd agent | `~/Library/LaunchAgents/com.mahesh.squish.plist`           |
-| Run log       | `~/Library/Logs/squish.log`                                |
-| launchd log   | `~/Library/Logs/squish.launchd.log`                        |
+| Thing         | Path                                                         |
+| ------------- | ------------------------------------------------------------ |
+| Watch folder  | `~/Movies/squish/clips` (change with `config set WATCH_DIR`) |
+| Output folder | `~/Movies/squish/compressed/` (one subfolder per video)      |
+| Config        | `~/.config/squish/config`                                    |
+| launchd agent | `~/Library/LaunchAgents/com.mahesh.squish.plist`             |
+| Run log       | `~/Library/Logs/squish.log`                                  |
+| launchd log   | `~/Library/Logs/squish.launchd.log`                          |
 
 Program files (placed by the installer):
 
-| Install     | CLI on PATH             | code + completion                              |
-| ----------- | ----------------------- | ---------------------------------------------- |
-| Homebrew    | `$(brew --prefix)/bin/squish` | `…/libexec/` · `…/share/zsh/site-functions/_squish` |
-| `install.sh`| `~/bin/squish`          | `~/.local/share/squish/` · `~/.zsh/completions/_squish` |
+| Install      | CLI on PATH                   | code + completion                                       |
+| ------------ | ----------------------------- | ------------------------------------------------------- |
+| Homebrew     | `$(brew --prefix)/bin/squish` | `…/libexec/` · `…/share/zsh/site-functions/_squish`     |
+| `install.sh` | `~/bin/squish`                | `~/.local/share/squish/` · `~/.zsh/completions/_squish` |
 
 ## Project layout
 

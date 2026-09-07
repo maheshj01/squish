@@ -9,6 +9,7 @@ _squish() {
   commands=(
     'status:show settings and whether it'\''s watching'
     'compress:compress one file now'
+    'convert:convert one file to a gif'
     'start:start watching (sets up on first run)'
     'stop:stop watching'
     'config:change settings — set / reset'
@@ -29,17 +30,17 @@ _squish() {
             _values 'action' 'set' 'reset'
           elif [[ $words[2] == set ]]; then
             case $CURRENT in
-              3) _values 'key' WATCH_DIR COMPRESSED_DIR CRF PRESET AUDIO_BITRATE NOTIFY ;;
+              3) _values 'key' WATCH_DIR COMPRESSED_DIR CRF PRESET AUDIO_BITRATE NOTIFY GIF_DIR GIF_FPS GIF_WIDTH ;;
               4)
                 case $words[3] in
                   PRESET) _values 'preset' ultrafast superfast veryfast faster fast medium slow slower veryslow placebo ;;
                   NOTIFY) _values 'notify' 0 1 ;;
-                  WATCH_DIR|COMPRESSED_DIR) _files -/ ;;
+                  WATCH_DIR|COMPRESSED_DIR|GIF_DIR) _files -/ ;;
                   *) _message 'value' ;;
                 esac ;;
             esac
           fi ;;
-        compress)
+        compress|convert)
           case $words[CURRENT] in
             -*) _values 'option' '--destination' ;;
             *)  [[ $words[CURRENT-1] == (-d|--destination) ]] && _files -/ || _files ;;

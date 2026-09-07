@@ -12,6 +12,9 @@ load_config() {
   PRESET="$DEFAULT_PRESET"
   AUDIO_BITRATE="$DEFAULT_AUDIO_BITRATE"
   NOTIFY="$DEFAULT_NOTIFY"
+  GIF_DIR="$DEFAULT_GIF_DIR"
+  GIF_FPS="$DEFAULT_GIF_FPS"
+  GIF_WIDTH="$DEFAULT_GIF_WIDTH"
 
   [[ -f "$CONFIG_FILE" ]] || return 0
   local line key val
@@ -21,7 +24,7 @@ load_config() {
     key="${line%%=*}"; val="${line#*=}"
     key="${key//[[:space:]]/}"
     case "$key" in
-      WATCH_DIR|COMPRESSED_DIR|CRF|PRESET|AUDIO_BITRATE|NOTIFY) printf -v "$key" '%s' "$val" ;;
+      WATCH_DIR|COMPRESSED_DIR|CRF|PRESET|AUDIO_BITRATE|NOTIFY|GIF_DIR|GIF_FPS|GIF_WIDTH) printf -v "$key" '%s' "$val" ;;
     esac
   done < "$CONFIG_FILE"
 }
@@ -37,6 +40,9 @@ save_config() {
     printf 'PRESET=%s\n'        "$PRESET"
     printf 'AUDIO_BITRATE=%s\n' "$AUDIO_BITRATE"
     printf 'NOTIFY=%s\n'        "$NOTIFY"
+    printf 'GIF_DIR=%s\n'       "$GIF_DIR"
+    printf 'GIF_FPS=%s\n'       "$GIF_FPS"
+    printf 'GIF_WIDTH=%s\n'     "$GIF_WIDTH"
   } > "$CONFIG_FILE"
 }
 
@@ -46,7 +52,7 @@ save_config() {
 validate() {
   local key="$1" val="$2"
   case "$key" in
-    WATCH_DIR|COMPRESSED_DIR)
+    WATCH_DIR|COMPRESSED_DIR|GIF_DIR)
       [[ -n "$val" ]] || die "$key cannot be empty"
       case "$val" in "~"/*) val="$HOME/${val#\~/}" ;; "~") val="$HOME" ;; esac
       printf '%s' "$val" ;;
@@ -70,6 +76,14 @@ validate() {
         0|1) printf '%s' "$val" ;;
         *) die "NOTIFY must be 0 or 1" ;;
       esac ;;
+    GIF_FPS)
+      [[ "$val" =~ ^[0-9]+$ ]] && (( val >= 1 && val <= 60 )) \
+        || die "GIF_FPS must be an integer 1–60 (frames per second)"
+      printf '%s' "$val" ;;
+    GIF_WIDTH)
+      [[ "$val" =~ ^[0-9]+$ ]] && (( val >= 16 && val <= 4096 )) \
+        || die "GIF_WIDTH must be an integer 16–4096 (pixels; height scales automatically)"
+      printf '%s' "$val" ;;
     *) die "unknown config key: $key (valid: ${KEYS[*]})" ;;
   esac
 }
@@ -93,12 +107,14 @@ cmd_config() {
           mkdir -p "$WATCH_DIR"
           reload_if_installed "watch folder changed" ;;
         COMPRESSED_DIR) mkdir -p "$COMPRESSED_DIR" ;;   # not in the plist, no reload
+        GIF_DIR)        mkdir -p "$GIF_DIR" ;;
       esac
       ;;
     reset)
       WATCH_DIR="$DEFAULT_WATCH_DIR"; COMPRESSED_DIR="$DEFAULT_COMPRESSED_DIR"
       CRF="$DEFAULT_CRF"; PRESET="$DEFAULT_PRESET"
       AUDIO_BITRATE="$DEFAULT_AUDIO_BITRATE"; NOTIFY="$DEFAULT_NOTIFY"
+      GIF_DIR="$DEFAULT_GIF_DIR"; GIF_FPS="$DEFAULT_GIF_FPS"; GIF_WIDTH="$DEFAULT_GIF_WIDTH"
       save_config
       ok "config reset to defaults (run '$APP status' to see them)"
       reload_if_installed "config reset"
