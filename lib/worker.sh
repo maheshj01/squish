@@ -14,6 +14,61 @@ _is_video() {
   esac
 }
 
+# seconds -> friendly duration, e.g. "45s" / "2m 10s" / "1h 3m"
+_fmt_dur() {
+  local s=$1 m
+  (( s < 60 ))  && { printf '%ds' "$s"; return; }
+  m=$(( s / 60 ))
+  (( m < 60 ))  && { printf '%dm %ds' "$m" $(( s % 60 )); return; }
+  printf '%dh %dm' $(( m / 60 )) $(( m % 60 ))
+}
+
+# ffprobe lives next to ffmpeg; derive it from the ffmpeg path we found.
+_ffprobe_for() { local p="${1%ffmpeg}ffprobe"; [[ -x "$p" ]] && printf '%s' "$p"; }
+
+# Integer seconds of a video (via ffprobe), or empty if unknown.
+_duration_secs() {
+  local ffprobe="$1" f="$2" d
+  [[ -x "$ffprobe" ]] || return 1
+  d="$("$ffprobe" -v error -show_entries format=duration -of default=nk=1:nw=1 "$f" 2>/dev/null)" || return 1
+  [[ "$d" =~ ^[0-9.]+$ ]] || return 1
+  printf '%.0f' "$d"
+}
+
+# Rough encode-time estimate = duration × a per-preset factor (percent). These
+# are ballpark for Apple Silicon at background priority; it's labelled "~".
+_eta_secs() {
+  local d="$1" f
+  case "$PRESET" in
+    ultrafast|superfast|veryfast|faster|fast) f=30 ;;
+    medium)                                   f=45 ;;
+    slow|slower)                              f=90 ;;
+    veryslow|placebo)                         f=160 ;;
+    *)                                        f=50 ;;
+  esac
+  local e=$(( d * f / 100 )); (( e < 1 )) && e=1; printf '%d' "$e"
+}
+
+# Notify the user. Prefers terminal-notifier, whose notifications carry a real
+# click action: REVEAL (if given) opens `open -R <file>` — selecting the file in
+# Finder — instead of launching Script Editor like a bare osascript notification.
+# GROUP lets a later notification replace an earlier one (e.g. done replaces start).
+#   _notify TITLE MESSAGE [REVEAL_PATH] [GROUP]
+_notify() {
+  (( NOTIFY )) || return 0
+  local title="$1" msg="$2" reveal="${3:-}" group="${4:-squish}"
+  local tn; tn="$(command -v terminal-notifier 2>/dev/null || true)"
+  if [[ -n "$tn" ]]; then
+    local args=(-title "$title" -message "$msg" -group "$group")
+    [[ -n "$reveal" ]] && args+=(-execute "open -R \"${reveal//\"/\\\"}\"")
+    "$tn" "${args[@]}" >/dev/null 2>&1 || true
+  else
+    # Fallback: no action button (clicking opens the posting app), no replace.
+    local t=${title//\\/\\\\}; t=${t//\"/\\\"}; local m=${msg//\\/\\\\}; m=${m//\"/\\\"}
+    /usr/bin/osascript -e "display notification \"$m\" with title \"$t\"" 2>/dev/null || true
+  fi
+}
+
 # Echo the ffmpeg path, or return 1. launchd gives us almost no PATH, so we look
 # in the usual Homebrew locations before falling back to PATH.
 _find_ffmpeg() {
@@ -99,18 +154,14 @@ cmd_run() {
   mkdir -p "$OUT_DIR" "$(dirname "$LOG")"
 
   log() { printf '%s  %s\n' "$(date '+%H:%M:%S')" "$*" >> "$LOG"; }
-  notify() {
-    (( NOTIFY )) || return 0
-    local t=${1//\\/\\\\}; t=${t//\"/\\\"}; local m=${2//\\/\\\\}; m=${m//\"/\\\"}
-    /usr/bin/osascript -e "display notification \"$m\" with title \"$t\"" 2>/dev/null || true
-  }
 
   log "──── run started (pid $$, user $(whoami)) ────"
 
   local FFMPEG; FFMPEG="$(_find_ffmpeg)" || {
     log "FATAL: ffmpeg not found. fix: brew install ffmpeg"
-    notify "Compression error" "ffmpeg not found"; return 1
+    _notify "Squish — error" "ffmpeg not found"; return 1
   }
+  local FFPROBE; FFPROBE="$(_ffprobe_for "$FFMPEG")"
   log "ffmpeg: $FFMPEG   (crf=$CRF preset=$PRESET audio=$AUDIO_BITRATE)"
 
   [[ -d "$WATCH_DIR" ]] || { log "FATAL: watch dir missing: $WATCH_DIR"; return 1; }
@@ -155,17 +206,23 @@ cmd_run() {
       wait_until_stable "$src" || { log "skip '$name': file never settled"; continue; }
 
       before=$(stat -f%z "$src")
-      log "encoding '$name' ($(_human "$before")) -> compressed/$base/$(basename "$dst")"
+      # estimate encode time from the clip's duration, for the start notification
+      local dur eta
+      dur="$(_duration_secs "$FFPROBE" "$src")" || dur=""
+      [[ -n "$dur" ]] && eta="~$(_fmt_dur "$(_eta_secs "$dur")")" || eta="estimating…"
+      log "encoding '$name' ($(_human "$before")) -> compressed/$base/$(basename "$dst")  (est $eta)"
       log "  ffmpeg output: $fflog"
+      _notify "Squish — compressing" "$name · $(_human "$before") · est $eta" "" "squish-$base"
       if _encode "$src" "$dst" "$fflog" "$FFMPEG"; then
         after=$(stat -f%z "$dst"); pct=$(( 100 - (after * 100 / before) ))
         log "OK: $(basename "$dst") — $(_human "$after"), ${pct}% smaller"
-        notify "Compression done" "$base — ${pct}% smaller"
+        # same -group replaces the "compressing" notice; click reveals the file
+        _notify "Squish — done" "$name — ${pct}% smaller  ·  click to reveal" "$dst" "squish-$base"
         processed=$(( processed + 1 )); pass_n=$(( pass_n + 1 ))
       else
         log "FAILED: '$name' — ffmpeg error. Last lines:"
         tail -5 "$fflog" 2>/dev/null | sed 's/^/    /' >> "$LOG"
-        notify "Compression failed" "$base"
+        _notify "Squish — failed" "$name" "" "squish-$base"
       fi
     done
     (( pass_n > 0 )) || break   # a full pass added nothing new — done

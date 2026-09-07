@@ -27,6 +27,9 @@ agent is silently denied there. The run log lives at `~/Library/Logs/squish.log`
 
 - macOS
 - [ffmpeg](https://ffmpeg.org/) — `brew install ffmpeg`
+- [terminal-notifier](https://github.com/julienXX/terminal-notifier) — `brew install terminal-notifier`
+  (optional but recommended: gives clickable notifications that reveal the output
+  in Finder; without it, squish falls back to plain `osascript` notifications)
 
 ## Install
 
