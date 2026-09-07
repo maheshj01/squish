@@ -57,7 +57,13 @@ _eta_secs() {
 _notify() {
   (( NOTIFY )) || return 0
   local title="$1" msg="$2" reveal="${3:-}" group="${4:-squish}"
-  local tn; tn="$(command -v terminal-notifier 2>/dev/null || true)"
+  # launchd gives the agent almost no PATH, so look in the Homebrew locations
+  # before PATH — otherwise terminal-notifier is "not found" under the agent and
+  # we fall back to osascript (whose notification opens Script Editor on click).
+  local tn c
+  for c in /opt/homebrew/bin/terminal-notifier /usr/local/bin/terminal-notifier "$(command -v terminal-notifier 2>/dev/null)"; do
+    [[ -x "$c" ]] && { tn="$c"; break; }
+  done
   if [[ -n "$tn" ]]; then
     local args=(-title "$title" -message "$msg" -group "$group")
     [[ -n "$reveal" ]] && args+=(-execute "open -R \"${reveal//\"/\\\"}\"")
